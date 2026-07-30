@@ -1,0 +1,148 @@
+// prisma/schema.prisma
+// نسخه‌ی MVP — ساده‌شده برای شروع واقعی پروژه
+// هدف: کمترین مدل ممکن که همچنان تمام ویژگی‌های اصلی (Streaming, Version History,
+// Error Handling) رو پوشش بده. چیزهایی که برای فاز اول لازم نبودن حذف شدن:
+// ApiUsageLog, RateLimitState, PostGenerationSettings جدا, UserRole/Admin
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum PostStatus {
+  DRAFT       // پیش‌نویس، هنوز Generate نشده
+  GENERATING  // در حال تولید (Streaming فعال)
+  COMPLETED   // تولید تمام شده، قابل ویرایش
+  FAILED      // خطا در تولید
+  CANCELLED   // توسط کاربر متوقف شده
+}
+
+enum GenerationStatus {
+  PENDING      // در صف، هنوز شروع نشده
+  STREAMING    // در حال دریافت توکن‌ها
+  COMPLETED    // با موفقیت تمام شده
+  FAILED       // خطا (network, timeout, provider error)
+  CANCELLED    // کاربر Stop زده
+  RATE_LIMITED // محدودیت نرخ از Provider
+}
+
+enum ContentFormat {
+  MARKDOWN
+  HTML
+}
+
+enum AIProvider {
+  ANTHROPIC
+  OPENAI
+}
+
+enum ToneStyle {
+  PROFESSIONAL
+  CASUAL
+  TECHNICAL
+  STORYTELLING
+  EDUCATIONAL
+}
+
+enum ContentLength {
+  SHORT   // ~500-800 کلمه
+  MEDIUM  // ~1000-1500 کلمه
+  LONG    // ~2000-3000 کلمه
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts BlogPost[]
+
+  @@map("users")
+}
+
+model BlogPost {
+  id             String        @id @default(cuid())
+  userId         String
+  title          String
+  topic          String        // موضوع/کلیدواژه‌ی اصلی که کاربر وارد می‌کنه
+  status         PostStatus    @default(DRAFT)
+
+  // تنظیمات تولید — مستقیم روی پست، بدون جدول جدا
+  // (اگه بعداً خواستی defaults سطح کاربر اضافه کنی، این می‌تونه به یک مدل جدا منتقل بشه)
+  provider       AIProvider    @default(ANTHROPIC)
+  model          String        @default("claude-sonnet-4-6")
+  tone           ToneStyle     @default(PROFESSIONAL)
+  length         ContentLength @default(MEDIUM)
+
+  finalContent   String?       // محتوای نهایی ویرایش‌شده (از TipTap)
+  finalFormat    ContentFormat @default(MARKDOWN)
+  wordCount      Int           @default(0)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions       ContentVersion[]
+  generationLogs GenerationLog[]
+
+  @@index([userId, status])
+  @@map("blog_posts")
+}
+
+model ContentVersion {
+  // هر بار Generate/Regenerate یک نسخه‌ی جدید می‌سازد.
+  // این جدول برای Version History و Rollback لازمه.
+  id            String        @id @default(cuid())
+  postId        String
+  versionNumber Int           // شماره‌گذاری مستقل به‌ازای هر پست: 1, 2, 3...
+  content       String        // محتوای خام تولیدشده توسط AI
+  format        ContentFormat @default(MARKDOWN)
+  isCurrent     Boolean       @default(false) // نسخه‌ی فعال برای نمایش/ویرایش
+  createdAt     DateTime      @default(now())
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, versionNumber])
+  @@index([postId, isCurrent])
+  @@map("content_versions")
+}
+
+model GenerationLog {
+  // لاگ هر تلاش تولید — برای دیباگ Streaming و مدیریت خطا.
+  // این چیزیه که در رزومه بهش اشاره می‌کنی: "مدیریت وضعیت‌های پیچیده‌ی تولید محتوا"
+  id           String           @id @default(cuid())
+  postId       String
+  status       GenerationStatus @default(PENDING)
+  provider     AIProvider
+  model        String
+
+  // خطا (وقتی status = FAILED یا RATE_LIMITED)
+  errorCode    String?          // مثلاً "RATE_LIMITED", "TIMEOUT", "PROVIDER_ERROR"
+  errorMessage String?
+
+  // چرا Generation قطع شد (اگه قطع شد)
+  abortReason  String?          // "USER_CANCELLED", "NETWORK_ERROR", "TIMEOUT"
+
+  durationMs   Int?             // چقدر طول کشید
+  createdAt    DateTime         @default(now())
+  completedAt  DateTime?
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("generation_logs")
+}

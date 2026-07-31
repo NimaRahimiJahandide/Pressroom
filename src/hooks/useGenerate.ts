@@ -82,6 +82,11 @@ export function useGenerate(): UseGenerateReturn {
         return;
       }
 
+      // logId comes back as a header — store it now, before reading any
+      // tokens, so Cancel has something to call from the very first moment.
+      const logId = response.headers.get('X-Generation-Log-Id');
+      useGenerationStore.getState().start(logId ?? '');
+
       const reader = response.body?.getReader();
       if (!reader) {
         useGenerationStore.getState().setError({

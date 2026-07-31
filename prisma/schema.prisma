@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -84,7 +84,7 @@ model BlogPost {
   // تنظیمات تولید — مستقیم روی پست، بدون جدول جدا
   // (اگه بعداً خواستی defaults سطح کاربر اضافه کنی، این می‌تونه به یک مدل جدا منتقل بشه)
   provider       AIProvider    @default(ANTHROPIC)
-  model          String        @default("claude-sonnet-4-6")
+  model          String        @default("claude-sonnet-5")
   tone           ToneStyle     @default(PROFESSIONAL)
   length         ContentLength @default(MEDIUM)
 

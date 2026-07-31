@@ -15,7 +15,10 @@ let client: OpenAI | null = null;
 
 function getClient(): OpenAI {
   if (!client) {
-    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL || undefined,
+    });
   }
   return client;
 }
@@ -49,6 +52,16 @@ export const openaiAdapter = {
           if (delta) {
             yield delta;
           }
+        }
+
+        // Some SDK/proxy implementations end the async iterator normally
+        // (instead of throwing) when the underlying request is aborted.
+        // Without this check, an aborted generation looks identical to a
+        // successful one and falls through to the success path.
+        if (signal.aborted) {
+          const abortError = new Error('Generation aborted');
+          abortError.name = 'AbortError';
+          throw abortError;
         }
       } finally {
         signal.removeEventListener('abort', onAbort);

@@ -308,26 +308,29 @@ export async function startGeneration(
           });
         }
 
-        // Update DB (fire-and-forget: don't block stream close)
-        prisma.$transaction([
-          prisma.generationLog.update({
-            where: { id: log.id },
-            data: {
-              status: logStatus,
-              errorCode,
-              errorMessage,
-              abortReason,
-              durationMs,
-              completedAt: new Date(),
-            },
-          }),
-          prisma.blogPost.update({
-            where: { id: postId },
-            data: { status: postStatus },
-          }),
-        ]).catch(() => {
+        // Update DB before closing the stream — awaited so status is
+        // consistent by the time cancelGeneration (or anything else) reads it.
+        try {
+          await prisma.$transaction([
+            prisma.generationLog.update({
+              where: { id: log.id },
+              data: {
+                status: logStatus,
+                errorCode,
+                errorMessage,
+                abortReason,
+                durationMs,
+                completedAt: new Date(),
+              },
+            }),
+            prisma.blogPost.update({
+              where: { id: postId },
+              data: { status: postStatus },
+            }),
+          ]);
+        } catch {
           /* ponytail: log to monitoring if added later */
-        });
+        }
 
         controller.close();
       } finally {
@@ -364,10 +367,14 @@ export async function cancelGeneration(
   }
 
   const controller = activeGenerations.get(logId);
-  if (controller) {
-    controller.abort('USER_CANCELLED');
-    activeGenerations.delete(logId);
+  if (!controller) {
+    // Status said PENDING/STREAMING but the generation already finished
+    // (or was never registered) — nothing to actually cancel.
+    throw new GenerationError('NOT_STREAMING', 409);
   }
+
+  controller.abort('USER_CANCELLED');
+  activeGenerations.delete(logId);
 
   return { success: true };
 }

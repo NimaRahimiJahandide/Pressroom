@@ -57,6 +57,14 @@ export const anthropicAdapter = {
             yield event.delta.text;
           }
         }
+
+        // Defensive: if abort fired but the SDK ended the iterator normally
+        // instead of throwing, don't let this look like a successful completion.
+        if (signal.aborted) {
+          const abortError = new Error('Generation aborted');
+          abortError.name = 'AbortError';
+          throw abortError;
+        }
       } finally {
         signal.removeEventListener('abort', onAbort);
       }

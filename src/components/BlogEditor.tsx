@@ -1,10 +1,47 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
 import { useGenerationStore } from '@/stores/generationStore';
 import { useGenerate } from '@/hooks/useGenerate';
+
+type ToolbarBtn = { label: string; active: boolean; disabled: boolean; onClick: () => void };
+
+function EditorToolbar({ editor, disabled }: { editor: Editor | null; disabled: boolean }) {
+  if (!editor) return null;
+  const btn = (label: string, active: boolean, onClick: () => void): ToolbarBtn => ({
+    label, active, disabled, onClick,
+  });
+  const buttons: ToolbarBtn[] = [
+    btn('B', editor.isActive('bold'), () => editor.chain().focus().toggleBold().run()),
+    btn('I', editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run()),
+    btn('H1', editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run()),
+    btn('H2', editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run()),
+    btn('•', editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run()),
+    btn('1.', editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run()),
+    btn('❝', editor.isActive('blockquote'), () => editor.chain().focus().toggleBlockquote().run()),
+  ];
+
+  return (
+    <div className="flex gap-1 pb-2 border-b mb-2">
+      {buttons.map((b) => (
+        <button
+          key={b.label}
+          type="button"
+          onClick={b.onClick}
+          disabled={b.disabled}
+          className={`px-3 py-1 text-sm rounded border ${
+            b.active ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300'
+          } ${b.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type BlogEditorProps = {
   postId: string;
@@ -12,11 +49,16 @@ type BlogEditorProps = {
 };
 
 export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
-  const { phase, tokens, generate, cancel } = useGenerate();
+  const { phase, tokens, generate, cancel, reset } = useGenerate();
   const versionId = useGenerationStore((s) => s.versionId);
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      // Lets setContent() parse the AI's markdown output as rich text,
+      // instead of treating it as (and mangling it like) raw HTML.
+      Markdown.configure({ html: false, breaks: true }),
+    ],
     content: initialContent ?? '',
     editable: phase === 'completed',
   });
@@ -52,7 +94,7 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
   const handleGenerate = () => generate(postId);
   const handleCancel = () => cancel();
   const handleReset = () => {
-    useGenerate().reset();
+    reset();
     if (initialContent) editor?.commands.setContent(initialContent);
   };
 
@@ -105,6 +147,7 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
 
       {/* Editor */}
       <div className="border rounded p-4 min-h-[300px] prose max-w-none">
+        <EditorToolbar editor={editor} disabled={!isDone} />
         <EditorContent editor={editor} />
       </div>
     </div>

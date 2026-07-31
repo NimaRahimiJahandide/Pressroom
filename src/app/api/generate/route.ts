@@ -31,18 +31,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { stream } = await startGeneration(
+    const { stream, logId } = await startGeneration(
       body.postId,
       session.userId,
       request.signal,
     );
 
-    // Return SSE stream
+    // Return SSE stream (logId in a header — client needs it before
+    // reading the first token so Cancel works from the start)
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
+        'X-Generation-Log-Id': logId,
       },
     });
   } catch (error: unknown) {

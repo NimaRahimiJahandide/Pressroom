@@ -46,9 +46,10 @@ export const anthropicAdapter = {
         response.abort();
       };
       if (signal.aborted) {
-        throw new Error('Generation aborted');
+        onAbort(); // already fired — addEventListener below won't catch it
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
       }
-      signal.addEventListener('abort', onAbort, { once: true });
 
       try {
         for await (const event of response) {
@@ -60,6 +61,15 @@ export const anthropicAdapter = {
         signal.removeEventListener('abort', onAbort);
       }
     } catch (error: unknown) {
+      // The SDK throws its own error shape on abort (not a DOMException),
+      // so check the signal itself first — this is what generationService
+      // uses to tell USER_CANCELLED / NETWORK_ERROR / TIMEOUT apart.
+      if (signal.aborted) {
+        const abortError = new Error('Generation aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
+
       // Map Anthropic-specific errors to our error classes
       if (error instanceof Anthropic.RateLimitError) {
         const retryAfter = (error as any).headers?.['retry-after'];

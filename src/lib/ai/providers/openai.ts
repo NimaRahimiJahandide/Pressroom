@@ -38,9 +38,10 @@ export const openaiAdapter = {
         response.controller.abort();
       };
       if (signal.aborted) {
-        throw new Error('Generation aborted');
+        onAbort(); // already fired — addEventListener below won't catch it
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
       }
-      signal.addEventListener('abort', onAbort, { once: true });
 
       try {
         for await (const chunk of response) {
@@ -53,6 +54,15 @@ export const openaiAdapter = {
         signal.removeEventListener('abort', onAbort);
       }
     } catch (error: unknown) {
+      // The SDK throws its own error shape on abort (not a DOMException),
+      // so check the signal itself first — this is what generationService
+      // uses to tell USER_CANCELLED / NETWORK_ERROR / TIMEOUT apart.
+      if (signal.aborted) {
+        const abortError = new Error('Generation aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
+
       if (error instanceof OpenAI.APIError) {
         if (error.status === 429) {
           const retryAfter = (error as any).headers?.['retry-after'];

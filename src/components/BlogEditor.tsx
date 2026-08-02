@@ -61,6 +61,11 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
     ],
     content: initialContent ?? '',
     editable: phase === 'completed',
+    // TipTap v3 defaults this to off for performance, but we need the
+    // toolbar's isActive() checks to re-evaluate on every transaction
+    // (selection change, formatting toggle) or the active-state highlight
+    // never updates.
+    shouldRerenderOnTransaction: true,
   });
 
   // When streaming: inject tokens as markdown into editor (read-only mode)

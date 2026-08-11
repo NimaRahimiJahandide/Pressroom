@@ -1,1 +1,302 @@
 @import "tailwindcss";
+
+/* ============================================================
+   Design tokens — "editorial workshop meets engineering console"
+   ============================================================ */
+@theme {
+  /* Surfaces */
+  --color-paper: #faf7f2; /* app background — warm, not cream */
+  --color-sheet: #fffdf9; /* the manuscript surface itself */
+  --color-panel: #f1ece1; /* recessed fills: toolbars, inputs */
+  --color-rule: #e2dccf; /* decorative hairlines */
+  --color-rule-strong: #cec7b6; /* decorative, heavier */
+  --color-field: #8b8066; /* form/control boundaries — ≥3:1 on every surface */
+
+  /* Text.
+     Muted is darkened from the brief's #8A8578 (3.4:1) to clear WCAG AA
+     on all three surfaces; same warm-gray hue, just enough weight to read. */
+  --color-ink: #1f2421; /* primary — warm charcoal */
+  --color-muted: #706a5d; /* secondary, timestamps, meta */
+
+  /* Signature accent — deep pine */
+  --color-pine: #2f6f4e;
+  --color-pine-deep: #24563d; /* pressed / keycap shadow */
+  --color-pine-wash: #e8efe9; /* tinted fills */
+
+  /* In-progress only. gold is the identity; gold-ink is the legible
+     foreground for text and marks sitting on gold-wash. */
+  --color-gold: #c9a227;
+  --color-gold-wash: #f6eed5;
+  --color-gold-ink: #7a6115;
+
+  /* Failure states */
+  --color-rust: #b23a3a;
+  --color-rust-wash: #f6e6e4;
+
+  /* Type roles */
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Motion */
+  --animate-blink: blink 1.05s steps(1, end) infinite;
+  --animate-breathe: breathe 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05" 1;
+  }
+
+  /* One focus treatment everywhere: a pine ring offset from the paper. */
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-pine-wash);
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+
+/* Small-caps mono label — the console voice. Used for status chips,
+   counters, field labels, and any machine-reported value. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+/* The typesetter's margin: one ruled line down the left of a sheet, the
+   way a manuscript page is prepared before anything is written on it. */
+@utility ruled-margin {
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-rule-strong) 8%,
+    var(--color-rule-strong) 92%,
+    transparent
+  );
+  background-repeat: no-repeat;
+  background-size: 1px 100%;
+}
+
+/* Physical control: rests on a hard edge and travels down when pressed.
+   Override the edge per-button with [--keycap-edge:#xxx] — read as a
+   fallback rather than a default so the two never fight over specificity. */
+@utility keycap {
+  box-shadow:
+    0 3px 0 0 var(--keycap-edge, var(--color-pine-deep)),
+    0 4px 10px -4px color-mix(in srgb, var(--color-ink) 45%, transparent);
+  transition:
+    transform 90ms ease,
+    box-shadow 90ms ease;
+
+  &:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 0 var(--keycap-edge, var(--color-pine-deep));
+  }
+}
+
+/* ============================================================
+   Manuscript surface (TipTap editor body)
+   ============================================================ */
+.manuscript .ProseMirror {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 20, "WONK" 0;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.manuscript .ProseMirror > * + * {
+  margin-top: 1.1em;
+}
+
+.manuscript .ProseMirror h1,
+.manuscript .ProseMirror h2,
+.manuscript .ProseMirror h3 {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 0, "WONK" 1;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.manuscript .ProseMirror h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 1.6em;
+}
+
+.manuscript .ProseMirror h2 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin-top: 1.5em;
+}
+
+.manuscript .ProseMirror h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.manuscript .ProseMirror ul,
+.manuscript .ProseMirror ol {
+  padding-left: 1.4em;
+}
+
+.manuscript .ProseMirror ul {
+  list-style: none;
+}
+
+.manuscript .ProseMirror ul li {
+  position: relative;
+}
+
+.manuscript .ProseMirror ul li::before {
+  content: "";
+  position: absolute;
+  left: -1em;
+  top: 0.72em;
+  width: 5px;
+  height: 5px;
+  background-color: var(--color-pine);
+}
+
+.manuscript .ProseMirror ol {
+  list-style: decimal;
+}
+
+.manuscript .ProseMirror ol li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-muted);
+}
+
+.manuscript .ProseMirror li + li {
+  margin-top: 0.35em;
+}
+
+.manuscript .ProseMirror blockquote {
+  border-left: 2px solid var(--color-pine);
+  padding-left: 1em;
+  color: color-mix(in srgb, var(--color-ink) 78%, var(--color-paper));
+  font-style: italic;
+}
+
+.manuscript .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background-color: var(--color-panel);
+  padding: 0.15em 0.35em;
+}
+
+.manuscript .ProseMirror pre {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  padding: 1em;
+  overflow-x: auto;
+}
+
+.manuscript .ProseMirror pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.manuscript .ProseMirror hr {
+  border: 0;
+  border-top: 1px solid var(--color-rule);
+}
+
+.manuscript .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+/* --- The signature: a block cursor at the end of the streamed text. ---
+   Attached to the last block of the document so it tracks the writing
+   head as the draft grows, the way a typewriter carriage does. */
+.is-streaming .ProseMirror > *:last-child::after {
+  content: "";
+  display: inline-block;
+  vertical-align: -0.14em;
+  width: 0.52em;
+  height: 1.05em;
+  margin-left: 0.06em;
+  background-color: var(--color-pine);
+  animation: var(--animate-blink);
+}
+
+.is-streaming .ProseMirror {
+  caret-color: transparent;
+}
+
+/* ============================================================
+   Reduced motion: hold the cursor solid, stop everything pulsing.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .is-streaming .ProseMirror > *:last-child::after {
+    animation: none !important;
+    opacity: 1;
+  }
+}

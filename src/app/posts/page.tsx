@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { usePosts } from '@/hooks/usePosts';
 import type { BlogPost } from '@prisma/client';
@@ -32,47 +33,89 @@ function PostsList() {
     }
   };
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">Error loading posts</div>;
+  if (isLoading) {
+    return (
+      <Shell>
+        <p className="label-mono animate-breathe text-muted">Loading drafts</p>
+      </Shell>
+    );
+  }
+
+  if (error) {
+    return (
+      <Shell>
+        <div className="border-l-2 border-rust bg-rust-wash/60 px-4 py-3">
+          <p className="label-mono text-rust">Could not load drafts</p>
+          <p className="mt-1.5 text-sm text-ink/75">
+            The post list did not come back. Reload the page to try again.
+          </p>
+        </div>
+      </Shell>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Your Posts</h1>
+    <Shell>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-5">
+        <div>
+          <p className="label-mono text-muted">
+            {posts.length} {posts.length === 1 ? 'draft' : 'drafts'}
+          </p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+            Your drafts
+          </h1>
+        </div>
         <button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="keycap bg-pine px-5 py-2.5 font-medium text-paper transition-colors hover:bg-pine-deep"
         >
-          New Post
+          New draft
         </button>
       </div>
 
       {posts.length === 0 ? (
-        <div className="text-center py-12 border rounded">
-          <p className="text-gray-500 mb-4">No posts yet. Create your first AI-powered blog post.</p>
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded">
-            Create your first post
+        <div className="mt-10 border border-dashed border-field bg-sheet px-6 py-14 text-center">
+          <p className="font-display text-xl tracking-tight">Nothing on the desk yet.</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">
+            Give the first draft a topic, a tone, and a length. You will watch it get written and
+            can stop it whenever you have enough.
+          </p>
+          <button
+            onClick={() => setShowModal(true)}
+            className="keycap mt-7 bg-pine px-5 py-2.5 font-medium text-paper transition-colors hover:bg-pine-deep"
+          >
+            Start your first draft
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <ul className="mt-8 space-y-3">
           {posts.map((post) => (
-            <button
-              key={post.id}
-              onClick={() => router.push(`/posts/${post.id}`)}
-              className="w-full text-left border rounded p-4 hover:border-blue-400 transition"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-lg">{post.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-1">{post.topic}</p>
+            <li key={post.id}>
+              <Link
+                href={`/posts/${post.id}`}
+                className="group block border border-rule bg-sheet transition-colors hover:border-field"
+              >
+                <div className="flex items-stretch">
+                  {/* Status reads as a painted edge before you read a word of it */}
+                  <span aria-hidden="true" className={`w-1 shrink-0 ${statusEdge[post.status]}`} />
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:gap-5 sm:px-5">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate font-display text-lg font-semibold tracking-tight decoration-pine/40 underline-offset-4 group-hover:underline">
+                        {post.title}
+                      </h2>
+                      <p className="mt-1 line-clamp-1 text-sm text-ink/70">{post.topic}</p>
+                      <p className="label-mono mt-2.5 text-muted">
+                        {post.tone} · {post.length} · {timeAgo(post.updatedAt)}
+                      </p>
+                    </div>
+                    <StatusBadge status={post.status} />
+                  </div>
                 </div>
-                <StatusBadge status={post.status} />
-              </div>
-              <div className="text-xs text-gray-400 mt-2">Updated {timeAgo(post.updatedAt)}</div>
-            </button>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {showModal && (
@@ -82,19 +125,77 @@ function PostsList() {
           isCreating={isCreating}
         />
       )}
+    </Shell>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-rule">
+        <div className="mx-auto flex max-w-4xl items-baseline justify-between gap-4 px-5 py-4 sm:px-8">
+          <Link
+            href="/"
+            className="font-display text-lg font-semibold tracking-tight decoration-pine/40 underline-offset-4 hover:underline"
+          >
+            Pressroom
+          </Link>
+          <span className="label-mono text-muted">Drafts</span>
+        </div>
+      </header>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-10 sm:px-8 sm:py-14">{children}</main>
     </div>
   );
 }
 
+/* Status vocabulary, shared by the edge stripe and the badge:
+   DRAFT muted gray · GENERATING gold · COMPLETED pine · FAILED rust ·
+   CANCELLED gray, but marked as a stop rather than a not-yet-started.
+   Stripes use the darker gold-ink so the mark clears 3:1 against the sheet —
+   #C9A227 itself only reaches 2.4:1 and would read as a smudge. */
+const statusEdge = {
+  DRAFT: 'bg-field',
+  GENERATING: 'bg-gold-ink',
+  COMPLETED: 'bg-pine',
+  FAILED: 'bg-rust',
+  CANCELLED: 'bg-muted',
+} as const;
 function StatusBadge({ status }: { status: BlogPost['status'] }) {
-  const colors = {
-    DRAFT: 'bg-gray-200 text-gray-700',
-    GENERATING: 'bg-blue-100 text-blue-700 animate-pulse',
-    COMPLETED: 'bg-green-100 text-green-700',
-    FAILED: 'bg-red-100 text-red-700',
-    CANCELLED: 'bg-amber-100 text-amber-700',
+  const styles = {
+    DRAFT: 'border-field bg-panel text-muted',
+    GENERATING: 'border-gold-ink/80 bg-gold-wash text-gold-ink',
+    COMPLETED: 'border-pine/80 bg-pine-wash text-pine-deep',
+    FAILED: 'border-rust/80 bg-rust-wash text-rust',
+    CANCELLED: 'border-field bg-panel text-muted',
   } as const;
-  return <span className={`px-2 py-1 rounded text-xs font-medium ${colors[status]}`}>{status}</span>;
+
+  const labels = {
+    DRAFT: 'Draft',
+    GENERATING: 'Generating',
+    COMPLETED: 'Completed',
+    FAILED: 'Failed',
+    CANCELLED: 'Stopped',
+  } as const;
+
+  return (
+    <span
+      className={`label-mono inline-flex shrink-0 items-center gap-1.5 self-start border px-2 py-1 ${styles[status]}`}
+    >
+      {status === 'GENERATING' && (
+        <span aria-hidden="true" className="block h-2 w-2 animate-breathe border border-gold-ink bg-gold" />
+      )}
+      {status === 'CANCELLED' && (
+        /* A filled square: the stop mark, distinct from DRAFT's blank slate */
+        <span aria-hidden="true" className="block h-1.5 w-1.5 bg-muted" />
+      )}
+      {status === 'FAILED' && (
+        <span aria-hidden="true" className="font-mono leading-none">
+          !
+        </span>
+      )}
+      {labels[status]}
+    </span>
+  );
 }
 
 function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; onSubmit: any; isCreating: boolean }) {
@@ -113,35 +214,60 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
     onSubmit({ title, topic, tone, length });
   };
 
+  const field =
+    'w-full border border-field bg-sheet px-3 py-2 text-[0.9375rem] placeholder:text-muted focus:border-pine';
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4">New Post</h2>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="text-red-600 text-sm mb-3">{error}</div>}
-          <label className="block mb-3">
-            <span className="block text-sm font-medium mb-1">Title</span>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-draft-title"
+        className="max-h-full w-full max-w-md overflow-y-auto border border-field bg-sheet shadow-[0_24px_60px_-30px_rgba(31,36,33,0.65)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-baseline justify-between gap-4 border-b border-rule bg-panel px-5 py-3">
+          <h2 id="new-draft-title" className="font-display text-lg font-semibold tracking-tight">
+            New draft
+          </h2>
+          <span className="label-mono text-muted">Setup</span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-5 py-5">
+          {error && (
+            <p role="alert" className="mb-4 border-l-2 border-rust bg-rust-wash/60 px-3 py-2 text-sm text-ink/80">
+              {error}
+            </p>
+          )}
+
+          <label className="block">
+            <span className="label-mono mb-1.5 block text-muted">Title</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border rounded px-3 py-2"
-              placeholder="My AI Adventure"
+              className={field}
+              placeholder="Why streaming beats waiting"
             />
           </label>
-          <label className="block mb-3">
-            <span className="block text-sm font-medium mb-1">Topic / Keyword</span>
+
+          <label className="mt-4 block">
+            <span className="label-mono mb-1.5 block text-muted">Topic</span>
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full border rounded px-3 py-2"
+              className={`${field} resize-y`}
               rows={3}
-              placeholder="Building web applications with Next.js"
+              placeholder="What the post should cover"
             />
           </label>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <label>
-              <span className="block text-sm font-medium mb-1">Tone</span>
-              <select value={tone} onChange={(e) => setTone(e.target.value as BlogPost['tone'])} className="w-full border rounded px-3 py-2">
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="label-mono mb-1.5 block text-muted">Tone</span>
+              <select value={tone} onChange={(e) => setTone(e.target.value as BlogPost['tone'])} className={field}>
                 <option value="PROFESSIONAL">Professional</option>
                 <option value="CASUAL">Casual</option>
                 <option value="TECHNICAL">Technical</option>
@@ -149,19 +275,30 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
                 <option value="EDUCATIONAL">Educational</option>
               </select>
             </label>
-            <label>
-              <span className="block text-sm font-medium mb-1">Length</span>
-              <select value={length} onChange={(e) => setLength(e.target.value as BlogPost['length'])} className="w-full border rounded px-3 py-2">
-                <option value="SHORT">Short (~500-800 words)</option>
-                <option value="MEDIUM">Medium (~1000-1500 words)</option>
-                <option value="LONG">Long (~2000-3000 words)</option>
+            <label className="block">
+              <span className="label-mono mb-1.5 block text-muted">Length</span>
+              <select value={length} onChange={(e) => setLength(e.target.value as BlogPost['length'])} className={field}>
+                <option value="SHORT">Short — 500–800 words</option>
+                <option value="MEDIUM">Medium — 1,000–1,500 words</option>
+                <option value="LONG">Long — 2,000–3,000 words</option>
               </select>
             </label>
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-gray-200 rounded">Cancel</button>
-            <button type="submit" disabled={isCreating} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50">
-              {isCreating ? 'Creating...' : 'Create'}
+
+          <div className="mt-7 flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-field bg-sheet px-4 py-2.5 font-medium transition-colors hover:bg-panel"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="keycap flex-1 bg-pine px-4 py-2.5 font-medium text-paper transition-colors hover:bg-pine-deep disabled:opacity-55"
+            >
+              {isCreating ? 'Creating…' : 'Create draft'}
             </button>
           </div>
         </form>

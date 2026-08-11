@@ -4,10 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { BlogEditor } from '@/components/BlogEditor';
 
-export default function PostPage() {
+type PostPageProps = {
+  params: { postId: string };
+};
+
+export default function PostPage({ params }: PostPageProps) {
   const [qc] = useState(() => new QueryClient());
-  // Hardcoded for demo — in real app, get postId from params
-  const postId = 'test-post-001';
+  const postId = params.postId;
 
   return (
     <QueryClientProvider client={qc}>

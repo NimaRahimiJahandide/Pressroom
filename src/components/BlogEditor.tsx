@@ -7,34 +7,39 @@ import { Markdown } from 'tiptap-markdown';
 import { useGenerationStore } from '@/stores/generationStore';
 import { useGenerate } from '@/hooks/useGenerate';
 
-type ToolbarBtn = { label: string; active: boolean; disabled: boolean; onClick: () => void };
+type ToolbarBtn = { label: string; title: string; active: boolean; disabled: boolean; onClick: () => void };
 
 function EditorToolbar({ editor, disabled }: { editor: Editor | null; disabled: boolean }) {
   if (!editor) return null;
-  const btn = (label: string, active: boolean, onClick: () => void): ToolbarBtn => ({
-    label, active, disabled, onClick,
+  const btn = (label: string, title: string, active: boolean, onClick: () => void): ToolbarBtn => ({
+    label, title, active, disabled, onClick,
   });
   const buttons: ToolbarBtn[] = [
-    btn('B', editor.isActive('bold'), () => editor.chain().focus().toggleBold().run()),
-    btn('I', editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run()),
-    btn('H1', editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run()),
-    btn('H2', editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run()),
-    btn('•', editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run()),
-    btn('1.', editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run()),
-    btn('❝', editor.isActive('blockquote'), () => editor.chain().focus().toggleBlockquote().run()),
+    btn('B', 'Bold', editor.isActive('bold'), () => editor.chain().focus().toggleBold().run()),
+    btn('I', 'Italic', editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run()),
+    btn('H1', 'Heading 1', editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run()),
+    btn('H2', 'Heading 2', editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run()),
+    btn('•', 'Bulleted list', editor.isActive('bulletList'), () => editor.chain().focus().toggleBulletList().run()),
+    btn('1.', 'Numbered list', editor.isActive('orderedList'), () => editor.chain().focus().toggleOrderedList().run()),
+    btn('❝', 'Quote', editor.isActive('blockquote'), () => editor.chain().focus().toggleBlockquote().run()),
   ];
 
   return (
-    <div className="flex gap-1 pb-2 border-b mb-2">
+    <div className="-mb-px flex flex-wrap items-center gap-1.5 border-b border-rule bg-sheet px-4 py-2.5 sm:px-5">
       {buttons.map((b) => (
         <button
           key={b.label}
           type="button"
           onClick={b.onClick}
           disabled={b.disabled}
-          className={`px-3 py-1 text-sm rounded border ${
-            b.active ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300'
-          } ${b.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+          title={b.title}
+          aria-label={b.title}
+          aria-pressed={b.active}
+          className={`min-w-9 border px-2.5 py-1.5 font-mono text-[0.8125rem] leading-none transition-colors ${
+            b.active
+              ? 'border-pine bg-pine text-paper'
+              : 'border-field bg-sheet text-ink/70'
+          } ${b.disabled ? 'cursor-not-allowed opacity-40' : 'hover:border-pine hover:bg-pine-wash'}`}
         >
           {b.label}
         </button>
@@ -108,53 +113,133 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
   const isDone = phase === 'completed';
   const isTerminal = phase === 'cancelled' || phase === 'error';
 
+  // Presentational counters, derived from the tokens already in the store.
+  const wordCount = tokens.trim() ? tokens.trim().split(/\s+/).length : 0;
+  const charCount = tokens.length;
+
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex gap-2">
-        {isIdle && (
-          <button onClick={handleGenerate} className="px-4 py-2 bg-blue-600 text-white rounded">
-            Generate
-          </button>
-        )}
-        {isStreaming && (
-          <button onClick={handleCancel} className="px-4 py-2 bg-red-600 text-white rounded">
-            Stop
-          </button>
-        )}
-        {isDone && (
-          <>
-            <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded">
-              Save
+    <div className="border border-rule-strong bg-sheet shadow-[0_1px_0_0_var(--color-rule),0_18px_44px_-34px_rgba(31,36,33,0.5)]">
+      {/* ── Console strip: state on the left, the physical control on the right ── */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 border-b border-rule bg-panel px-4 py-3 sm:px-5">
+        <PhaseChip phase={phase} />
+
+        <span className="label-mono text-muted">{wordCount} words</span>
+        <span aria-hidden="true" className="label-mono text-muted">/</span>
+        <span className="label-mono text-muted">{charCount} chars</span>
+
+        <div
+          className="ml-auto flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Draft controls"
+        >
+          {isIdle && (
+            <button
+              onClick={handleGenerate}
+              className="keycap bg-pine px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-pine-deep"
+            >
+              Write draft
             </button>
-            <button onClick={handleReset} className="px-4 py-2 bg-gray-400 text-white rounded">
-              Reset
+          )}
+
+          {isStreaming && (
+            /* Weighted like a hardware stop: ink body, hard bottom edge,
+               travels down on press. Not a generic red button. */
+            <button
+              onClick={handleCancel}
+              className="keycap inline-flex items-center gap-2 bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-black [--keycap-edge:#0f1211]"
+            >
+              <span aria-hidden="true" className="block h-2.5 w-2.5 bg-paper" />
+              Stop
             </button>
-          </>
-        )}
-        {isTerminal && (
-          <button onClick={handleReset} className="px-4 py-2 bg-gray-400 text-white rounded">
-            Try Again
-          </button>
-        )}
+          )}
+
+          {isDone && (
+            <>
+              <button
+                onClick={handleSave}
+                className="keycap bg-pine px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-pine-deep"
+              >
+                Save
+              </button>
+              <button
+                onClick={handleReset}
+                className="border border-field bg-sheet px-4 py-2 text-sm font-medium text-ink/80 transition-colors hover:bg-panel"
+              >
+                Discard
+              </button>
+            </>
+          )}
+
+          {isTerminal && (
+            <button
+              onClick={handleReset}
+              className="keycap bg-pine px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-pine-deep"
+            >
+              Write again
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Status banner */}
-      {isStreaming && (
-        <div className="text-sm text-blue-600 animate-pulse">Generating...</div>
-      )}
+      {/* ── Status line: only speaks when there is something to report ── */}
       {phase === 'error' && (
-        <div className="text-sm text-red-600">Generation failed. Partial content shown.</div>
+        <p className="border-b border-rule border-l-2 border-l-rust bg-rust-wash/60 px-4 py-2.5 text-sm text-ink/80 sm:px-5">
+          Generation failed. The words that arrived before it stopped are below.
+        </p>
       )}
       {phase === 'cancelled' && (
-        <div className="text-sm text-amber-600">Generation cancelled. Partial content shown.</div>
+        <p className="border-b border-rule border-l-2 border-l-muted bg-panel/70 px-4 py-2.5 text-sm text-ink/80 sm:px-5">
+          You stopped the draft at {wordCount} words. Everything written so far is kept.
+        </p>
       )}
 
-      {/* Editor */}
-      <div className="border rounded p-4 min-h-[300px] prose max-w-none">
-        <EditorToolbar editor={editor} disabled={!isDone} />
+      {/* ── Formatting strip: only live once the draft is yours to edit ── */}
+      <EditorToolbar editor={editor} disabled={!isDone} />
+
+      {/* ── The sheet ── */}
+      <div
+        className={`manuscript ruled-margin min-h-[22rem] px-6 py-7 pl-10 [background-position:1.75rem_0] sm:px-8 sm:pl-14 ${
+          isStreaming ? 'is-streaming' : ''
+        }`}
+      >
         <EditorContent editor={editor} />
+
+        {isIdle && !tokens && !initialContent && (
+          <p className="font-display text-[1.0625rem] leading-relaxed text-muted">
+            The draft will appear here, a word at a time. Press Write draft to begin.
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+/* Same status vocabulary as the post list, keyed to generation phase. */
+function PhaseChip({ phase }: { phase: ReturnType<typeof useGenerate>['phase'] }) {
+  const map = {
+    idle: { label: 'Draft', className: 'border-field bg-sheet text-muted', dot: '' },
+    generating: { label: 'Generating', className: 'border-gold-ink/80 bg-gold-wash text-gold-ink', dot: 'border border-gold-ink bg-gold' },
+    completed: { label: 'Completed', className: 'border-pine/80 bg-pine-wash text-pine-deep', dot: '' },
+    cancelled: { label: 'Stopped', className: 'border-field bg-panel text-muted', dot: 'bg-muted' },
+    error: { label: 'Failed', className: 'border-rust/80 bg-rust-wash text-rust', dot: '' },
+  } as const;
+  const { label, className, dot } = map[phase];
+
+  return (
+    <span
+      aria-live="polite"
+      className={`label-mono inline-flex items-center gap-1.5 border px-2 py-1 ${className}`}
+    >
+      {dot && (
+        <span
+          aria-hidden="true"
+          className={`block h-1.5 w-1.5 ${dot} ${phase === 'generating' ? 'animate-breathe' : ''}`}
+        />
+      )}
+      {phase === 'error' && (
+        <span aria-hidden="true" className="font-mono leading-none">!</span>
+      )}
+      {label}
+    </span>
   );
 }

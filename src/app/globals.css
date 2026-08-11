@@ -68,15 +68,10 @@
    Base
    ============================================================ */
 @layer base {
-  html {
-    -webkit-text-size-adjust: 100%;
-  }
-
   body {
     background-color: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "cv05" 1;
   }
 
   /* One focus treatment everywhere: a pine ring offset from the paper. */
@@ -255,14 +250,6 @@
 .manuscript .ProseMirror hr {
   border: 0;
   border-top: 1px solid var(--color-rule);
-}
-
-.manuscript .ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  color: var(--color-muted);
-  pointer-events: none;
 }
 
 /* --- The signature: a block cursor at the end of the streamed text. ---

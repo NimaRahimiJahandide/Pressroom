@@ -25,7 +25,7 @@ function EditorToolbar({ editor, disabled }: { editor: Editor | null; disabled: 
   ];
 
   return (
-    <div className="-mb-px flex flex-wrap items-center gap-1.5 border-b border-rule bg-sheet px-4 py-2.5 sm:px-5">
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-rule bg-sheet px-4 py-2.5 sm:px-5">
       {buttons.map((b) => (
         <button
           key={b.label}

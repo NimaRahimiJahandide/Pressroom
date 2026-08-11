@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { usePosts } from '@/hooks/usePosts';
-import type { BlogPost } from '@prisma/client';
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { usePosts } from "@/hooks/usePosts";
+import type { BlogPost } from "@prisma/client";
 
 export default function PostsPage() {
   const [qc] = useState(() => new QueryClient());
@@ -18,18 +18,27 @@ export default function PostsPage() {
 
 function PostsList() {
   const router = useRouter();
-  const { data: posts, isLoading, error, mutateAsync: createPost, isCreating } = usePosts();
+  const {
+    data: posts,
+    isLoading,
+    error,
+    mutateAsync: createPost,
+    isCreating,
+  } = usePosts();
   const [showModal, setShowModal] = useState(false);
 
-  const handleCreate = async (data: { title: string; topic: string; tone: BlogPost['tone']; length: BlogPost['length'] }) => {
+  const handleCreate = async (data: {
+    title: string;
+    topic: string;
+    tone: BlogPost["tone"];
+    length: BlogPost["length"];
+    provider: BlogPost["provider"];
+  }) => {
     try {
-      const post = await createPost({
-        ...data,
-        provider: 'OPENAI', // default
-      });
+      const post = await createPost(data);
       router.push(`/posts/${post.id}`);
     } catch (e) {
-      console.error('Failed to create post:', e);
+      console.error("Failed to create post:", e);
     }
   };
 
@@ -59,7 +68,7 @@ function PostsList() {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-5">
         <div>
           <p className="label-mono text-muted">
-            {posts.length} {posts.length === 1 ? 'draft' : 'drafts'}
+            {posts.length} {posts.length === 1 ? "draft" : "drafts"}
           </p>
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
             Your drafts
@@ -75,10 +84,12 @@ function PostsList() {
 
       {posts.length === 0 ? (
         <div className="mt-10 border border-dashed border-field bg-sheet px-6 py-14 text-center">
-          <p className="font-display text-xl tracking-tight">Nothing on the desk yet.</p>
+          <p className="font-display text-xl tracking-tight">
+            Nothing on the desk yet.
+          </p>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted">
-            Give the first draft a topic, a tone, and a length. You will watch it get written and
-            can stop it whenever you have enough.
+            Give the first draft a topic, a tone, and a length. You will watch
+            it get written and can stop it whenever you have enough.
           </p>
           <button
             onClick={() => setShowModal(true)}
@@ -97,14 +108,19 @@ function PostsList() {
               >
                 <div className="flex items-stretch">
                   {/* Status reads as a painted edge before you read a word of it */}
-                  <span aria-hidden="true" className={`w-1 shrink-0 ${statusEdge[post.status]}`} />
+                  <span
+                    aria-hidden="true"
+                    className={`w-1 shrink-0 ${statusEdge[post.status]}`}
+                  />
 
                   <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:gap-5 sm:px-5">
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate font-display text-lg font-semibold tracking-tight decoration-pine/40 underline-offset-4 group-hover:underline">
                         {post.title}
                       </h2>
-                      <p className="mt-1 line-clamp-1 text-sm text-ink/70">{post.topic}</p>
+                      <p className="mt-1 line-clamp-1 text-sm text-ink/70">
+                        {post.topic}
+                      </p>
                       <p className="label-mono mt-2.5 text-muted">
                         {post.tone} · {post.length} · {timeAgo(post.updatedAt)}
                       </p>
@@ -143,7 +159,9 @@ function Shell({ children }: { children: React.ReactNode }) {
           <span className="label-mono text-muted">Drafts</span>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-10 sm:px-8 sm:py-14">{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
+        {children}
+      </main>
     </div>
   );
 }
@@ -154,41 +172,44 @@ function Shell({ children }: { children: React.ReactNode }) {
    Stripes use the darker gold-ink so the mark clears 3:1 against the sheet —
    #C9A227 itself only reaches 2.4:1 and would read as a smudge. */
 const statusEdge = {
-  DRAFT: 'bg-field',
-  GENERATING: 'bg-gold-ink',
-  COMPLETED: 'bg-pine',
-  FAILED: 'bg-rust',
-  CANCELLED: 'bg-muted',
+  DRAFT: "bg-field",
+  GENERATING: "bg-gold-ink",
+  COMPLETED: "bg-pine",
+  FAILED: "bg-rust",
+  CANCELLED: "bg-muted",
 } as const;
-function StatusBadge({ status }: { status: BlogPost['status'] }) {
+function StatusBadge({ status }: { status: BlogPost["status"] }) {
   const styles = {
-    DRAFT: 'border-field bg-panel text-muted',
-    GENERATING: 'border-gold-ink/80 bg-gold-wash text-gold-ink',
-    COMPLETED: 'border-pine/80 bg-pine-wash text-pine-deep',
-    FAILED: 'border-rust/80 bg-rust-wash text-rust',
-    CANCELLED: 'border-field bg-panel text-muted',
+    DRAFT: "border-field bg-panel text-muted",
+    GENERATING: "border-gold-ink/80 bg-gold-wash text-gold-ink",
+    COMPLETED: "border-pine/80 bg-pine-wash text-pine-deep",
+    FAILED: "border-rust/80 bg-rust-wash text-rust",
+    CANCELLED: "border-field bg-panel text-muted",
   } as const;
 
   const labels = {
-    DRAFT: 'Draft',
-    GENERATING: 'Generating',
-    COMPLETED: 'Completed',
-    FAILED: 'Failed',
-    CANCELLED: 'Stopped',
+    DRAFT: "Draft",
+    GENERATING: "Generating",
+    COMPLETED: "Completed",
+    FAILED: "Failed",
+    CANCELLED: "Stopped",
   } as const;
 
   return (
     <span
       className={`label-mono inline-flex shrink-0 items-center gap-1.5 self-start border px-2 py-1 ${styles[status]}`}
     >
-      {status === 'GENERATING' && (
-        <span aria-hidden="true" className="block h-2 w-2 animate-breathe border border-gold-ink bg-gold" />
+      {status === "GENERATING" && (
+        <span
+          aria-hidden="true"
+          className="block h-2 w-2 animate-breathe border border-gold-ink bg-gold"
+        />
       )}
-      {status === 'CANCELLED' && (
+      {status === "CANCELLED" && (
         /* A filled square: the stop mark, distinct from DRAFT's blank slate */
         <span aria-hidden="true" className="block h-1.5 w-1.5 bg-muted" />
       )}
-      {status === 'FAILED' && (
+      {status === "FAILED" && (
         <span aria-hidden="true" className="font-mono leading-none">
           !
         </span>
@@ -198,24 +219,33 @@ function StatusBadge({ status }: { status: BlogPost['status'] }) {
   );
 }
 
-function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; onSubmit: any; isCreating: boolean }) {
-  const [title, setTitle] = useState('');
-  const [topic, setTopic] = useState('');
-  const [tone, setTone] = useState<BlogPost['tone']>('PROFESSIONAL');
-  const [length, setLength] = useState<BlogPost['length']>('MEDIUM');
+function CreateModal({
+  onClose,
+  onSubmit,
+  isCreating,
+}: {
+  onClose: () => void;
+  onSubmit: any;
+  isCreating: boolean;
+}) {
+  const [title, setTitle] = useState("");
+  const [topic, setTopic] = useState("");
+  const [tone, setTone] = useState<BlogPost["tone"]>("PROFESSIONAL");
+  const [length, setLength] = useState<BlogPost["length"]>("MEDIUM");
+  const [provider, setProvider] = useState<BlogPost["provider"]>("ANTHROPIC");
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !topic.trim()) {
-      setError('Title and topic are required');
+      setError("Title and topic are required");
       return;
     }
-    onSubmit({ title, topic, tone, length });
+    onSubmit({ title, topic, tone, length, provider });
   };
 
   const field =
-    'w-full border border-field bg-sheet px-3 py-2 text-[0.9375rem] placeholder:text-muted focus:border-pine';
+    "w-full border border-field bg-sheet px-3 py-2 text-[0.9375rem] placeholder:text-muted focus:border-pine";
 
   return (
     <div
@@ -230,7 +260,10 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-baseline justify-between gap-4 border-b border-rule bg-panel px-5 py-3">
-          <h2 id="new-draft-title" className="font-display text-lg font-semibold tracking-tight">
+          <h2
+            id="new-draft-title"
+            className="font-display text-lg font-semibold tracking-tight"
+          >
             New draft
           </h2>
           <span className="label-mono text-muted">Setup</span>
@@ -238,7 +271,10 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
 
         <form onSubmit={handleSubmit} className="px-5 py-5">
           {error && (
-            <p role="alert" className="mb-4 border-l-2 border-rust bg-rust-wash/60 px-3 py-2 text-sm text-ink/80">
+            <p
+              role="alert"
+              className="mb-4 border-l-2 border-rust bg-rust-wash/60 px-3 py-2 text-sm text-ink/80"
+            >
               {error}
             </p>
           )}
@@ -267,7 +303,11 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="label-mono mb-1.5 block text-muted">Tone</span>
-              <select value={tone} onChange={(e) => setTone(e.target.value as BlogPost['tone'])} className={field}>
+              <select
+                value={tone}
+                onChange={(e) => setTone(e.target.value as BlogPost["tone"])}
+                className={field}
+              >
                 <option value="PROFESSIONAL">Professional</option>
                 <option value="CASUAL">Casual</option>
                 <option value="TECHNICAL">Technical</option>
@@ -277,10 +317,31 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
             </label>
             <label className="block">
               <span className="label-mono mb-1.5 block text-muted">Length</span>
-              <select value={length} onChange={(e) => setLength(e.target.value as BlogPost['length'])} className={field}>
+              <select
+                value={length}
+                onChange={(e) =>
+                  setLength(e.target.value as BlogPost["length"])
+                }
+                className={field}
+              >
                 <option value="SHORT">Short — 500–800 words</option>
                 <option value="MEDIUM">Medium — 1,000–1,500 words</option>
                 <option value="LONG">Long — 2,000–3,000 words</option>
+              </select>
+            </label>
+            <label className="mt-4 block">
+              <span className="label-mono mb-1.5 block text-muted">
+                Provider
+              </span>
+              <select
+                value={provider}
+                onChange={(e) =>
+                  setProvider(e.target.value as BlogPost["provider"])
+                }
+                className={field}
+              >
+                <option value="ANTHROPIC">Anthropic (Claude)</option>
+                <option value="OPENAI">OpenAI (GPT)</option>
               </select>
             </label>
           </div>
@@ -298,7 +359,7 @@ function CreateModal({ onClose, onSubmit, isCreating }: { onClose: () => void; o
               disabled={isCreating}
               className="keycap flex-1 bg-pine px-4 py-2.5 font-medium text-paper transition-colors hover:bg-pine-deep disabled:opacity-55"
             >
-              {isCreating ? 'Creating…' : 'Create draft'}
+              {isCreating ? "Creating…" : "Create draft"}
             </button>
           </div>
         </form>

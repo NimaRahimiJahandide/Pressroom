@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery, useMutation, type UseMutateFunction } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type UseMutateFunction } from '@tanstack/react-query';
 import type { BlogPost } from '@prisma/client';
 
 type CreatePostInput = {
@@ -12,6 +12,7 @@ type CreatePostInput = {
 };
 
 export function usePosts() {
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['posts'],
     queryFn: async () => {
@@ -35,7 +36,7 @@ export function usePosts() {
       return res.json() as Promise<BlogPost>;
     },
     onSuccess: () => {
-      // Invalidate and refetch automatically via queryClient in onSuccess
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
     },
   });
 

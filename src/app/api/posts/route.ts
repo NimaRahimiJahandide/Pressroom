@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from '@/lib/auth';
 
+ const DEFAULT_MODEL: Record<string, string> = {
+   ANTHROPIC: 'claude-sonnet-5',
+   OPENAI: 'meta-llama/llama-3.1-8b-instruct:free',
+ };
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.userId) {
@@ -20,7 +24,7 @@ export async function POST(request: NextRequest) {
       topic: body.topic.trim(),
       tone: body.tone ?? 'PROFESSIONAL',
       length: body.length ?? 'MEDIUM',
-      provider: body.provider ?? 'ANTHROPIC',
+      model: DEFAULT_MODEL[body.provider ?? 'ANTHROPIC'],
       status: 'DRAFT',
     },
     select: { id: true, title: true, topic: true, status: true, updatedAt: true, userId: true },

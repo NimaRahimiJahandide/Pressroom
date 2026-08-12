@@ -2,7 +2,7 @@
   "name": "pressroom",
   "version": "0.1.0",
   "private": true,
-  "description": "AI-powered blog post generator — Next.js App Router, Prisma, Vercel AI SDK",
+  "description": "Pressroom — an AI blog-post drafting tool with live streaming, cancel, and version history",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

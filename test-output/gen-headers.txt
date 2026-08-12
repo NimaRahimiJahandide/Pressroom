@@ -1,9 +1,0 @@
-HTTP/1.1 200 OK
-vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch
-cache-control: no-cache, no-transform
-connection: keep-alive
-content-type: text/event-stream
-x-generation-log-id: cms8miwqz0009vc90ijzbk8ws
-Date: Fri, 31 Jul 2026 07:31:19 GMT
-Transfer-Encoding: chunked
-

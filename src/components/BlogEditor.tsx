@@ -71,6 +71,7 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
     // (selection change, formatting toggle) or the active-state highlight
     // never updates.
     shouldRerenderOnTransaction: true,
+    immediatelyRender: false,
   });
 
   // When streaming: inject tokens as markdown into editor (read-only mode)

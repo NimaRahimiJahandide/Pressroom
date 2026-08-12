@@ -34,6 +34,7 @@ export const openaiAdapter = {
         model,
         messages: [{ role: 'user', content: prompt }],
         stream: true,
+        max_tokens: 2048,
       });
 
       // Abort listener

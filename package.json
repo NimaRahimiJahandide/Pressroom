@@ -1,5 +1,5 @@
 {
-  "name": "Pressroom",
+  "name": "pressroom",
   "version": "0.1.0",
   "private": true,
   "description": "AI-powered blog post generator — Next.js App Router, Prisma, Vercel AI SDK",

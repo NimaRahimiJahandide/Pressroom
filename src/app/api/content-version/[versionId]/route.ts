@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from '@/lib/auth';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { versionId: string } },
 ) {
+  const session = await getServerSession();
+  if (!session?.userId) {
+    return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+  }
+
   const { versionId } = params;
   const body = await request.json().catch(() => null);
 
@@ -12,7 +18,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'MISSING_CONTENT' }, { status: 400 });
   }
 
-  const version = await prisma.contentVersion.findUnique({ where: { id: versionId } });
+  // Ownership is part of the lookup: someone else's version is simply "not found".
+  const version = await prisma.contentVersion.findFirst({
+    where: { id: versionId, post: { userId: session.userId } },
+    select: { id: true },
+  });
   if (!version) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 });
   }

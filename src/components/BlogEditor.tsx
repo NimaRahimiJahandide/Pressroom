@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -57,6 +57,12 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
   const { phase, tokens, generate, cancel, reset } = useGenerate();
   const versionId = useGenerationStore((s) => s.versionId);
 
+  // `phase` only leaves 'idle' once the POST /api/generate response headers
+  // arrive — until then the Write draft button would stay clickable and fire
+  // duplicate requests for the same postId. This flag flips synchronously
+  // on click, closing that window.
+  const [isStarting, setIsStarting] = useState(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -102,7 +108,15 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
     });
   }, [editor, versionId]);
 
-  const handleGenerate = () => generate(postId);
+  const handleGenerate = useCallback(async () => {
+    if (isStarting) return; // already in flight — ignore extra clicks
+    setIsStarting(true);
+    try {
+      await generate(postId);
+    } finally {
+      setIsStarting(false);
+    }
+  }, [generate, postId, isStarting]);
   const handleCancel = () => cancel();
   const handleReset = () => {
     reset();
@@ -136,9 +150,13 @@ export function BlogEditor({ postId, initialContent }: BlogEditorProps) {
           {isIdle && (
             <button
               onClick={handleGenerate}
-              className="keycap bg-pine px-4 py-2 text-sm font-medium text-paper transition-colors hover:bg-pine-deep"
+              disabled={isStarting}
+              aria-busy={isStarting}
+              className={`keycap bg-pine px-4 py-2 text-sm font-medium text-paper transition-colors ${
+                isStarting ? 'cursor-not-allowed opacity-60' : 'hover:bg-pine-deep'
+              }`}
             >
-              Write draft
+              {isStarting ? 'Starting…' : 'Write draft'}
             </button>
           )}
 

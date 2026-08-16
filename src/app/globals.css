@@ -287,3 +287,50 @@
     opacity: 1;
   }
 }
+
+/* ============================================================
+   Print: "Export as PDF" — show only the manuscript, nothing else.
+   Every interactive chrome element carries `.no-print`; the rest of
+   the page (header, nav, version history) is hidden by default.
+   ============================================================ */
+@media print {
+  /* Hide everything that isn't the manuscript content */
+  .no-print,
+  header,
+  nav,
+  aside,
+  .ProseMirror-empty::before {
+    display: none !important;
+  }
+
+  /* Reset the editor card — no shadow, no border, no margin line */
+  .manuscript {
+    box-shadow: none !important;
+    border: none !important;
+    background-image: none !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  /* The editor surface itself should fill the page cleanly */
+  .manuscript .ProseMirror {
+    font-size: 12pt;
+    line-height: 1.6;
+  }
+
+  /* Use the browser's default page margins */
+  @page {
+    margin: 1in;
+  }
+
+  /* Ensure the manuscript sits at the top of the first page */
+  body {
+    background: white !important;
+  }
+
+  /* Expand the editor container so nothing is clipped */
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

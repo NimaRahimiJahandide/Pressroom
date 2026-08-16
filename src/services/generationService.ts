@@ -7,11 +7,18 @@
  * for generation-related writes.
  *
  * Responsibilities:
- *   - startGeneration(postId, userId): create GenerationLog, build prompt,
- *     stream tokens, and on success: atomic transaction (new ContentVersion +
+ *   - startGeneration(postId, userId, requestSignal, options?): create GenerationLog,
+ *     build prompt, stream tokens, and on success: atomic transaction (new ContentVersion +
  *     log + post update). Returns the ReadableStream.
  *   - cancelGeneration(logId): abort an in-flight generation.
  *   - isGenerating(postId): check if a generation is active for a post.
+ *
+ * Resume-after-cancel:
+ *   When a user cancels mid-stream, the partial content is persisted as a
+ *   ContentVersion (isCurrent = true) so a page refresh doesn't lose the
+ *   draft. A subsequent call with { continueFromExisting: true } picks up
+ *   from post.finalContent — fullContent is seeded with the existing text
+ *   so the saved version contains old + new content.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -94,6 +101,24 @@ function buildPrompt(topic: string, tone: string, length: string): string {
   ].join('\n');
 }
 
+/**
+ * Continuation prompt for resume-after-cancel. The model sees the entire
+ * draft so far and is told to pick up seamlessly without restating.
+ */
+function buildContinuationPrompt(existingContent: string): string {
+  return [
+    'You are continuing a blog post that was cut off mid-sentence or mid-paragraph.',
+    'Here is everything written so far:',
+    '---',
+    existingContent,
+    '---',
+    'Continue writing directly from where it left off.',
+    'Do not repeat, summarize, or restate any of the text above.',
+    'Do not add a heading or preamble.',
+    'Output ONLY the new continuation text in Markdown, picking up seamlessly.',
+  ].join('\n');
+}
+
 // ==========================================
 // wordCount helper
 // ==========================================
@@ -109,10 +134,17 @@ export type GenerationResult = {
   logId: string;
 };
 
+export type StartGenerationOptions = {
+  /** When true, seed fullContent with the post's existing finalContent
+   *  and send a `resume` SSE event so the client can seed its tokens. */
+  continueFromExisting?: boolean;
+};
+
 export async function startGeneration(
   postId: string,
   userId: string,
   requestSignal: AbortSignal,
+  options?: StartGenerationOptions,
 ): Promise<GenerationResult> {
   // 1. Fetch the post (validates ownership + status)
   const post = await prisma.blogPost.findFirst({
@@ -163,13 +195,26 @@ export async function startGeneration(
     timeoutSignal,
   );
 
-  // 6. Build prompt and get provider adapter
-  const prompt = buildPrompt(post.topic, post.tone, post.length);
+  // 6. Determine continuation mode
+  //    If the post has existing finalContent and the caller asked to
+  //    continue, seed fullContent with it and build a continuation prompt.
+  //    Otherwise generate from scratch.
+  const existingContent =
+    options?.continueFromExisting && post.finalContent && post.finalContent.trim().length > 0
+      ? post.finalContent
+      : null;
+
+  const prompt = existingContent
+    ? buildContinuationPrompt(existingContent)
+    : buildPrompt(post.topic, post.tone, post.length);
+
   const adapter = await createProviderAdapter(post.provider);
 
   // 7. Create the SSE ReadableStream
   const startTime = Date.now();
-  let fullContent = '';
+  // Seed with existing content when continuing so the final saved version
+  // includes the old + new text. Empty string for normal generation.
+  let fullContent = existingContent ?? '';
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -187,6 +232,13 @@ export async function startGeneration(
           where: { id: log.id },
           data: { status: 'STREAMING' },
         });
+
+        // If continuing, seed the client with existing content before
+        // any token events arrive. The client calls seedTokens() on
+        // this event so its local state matches fullContent.
+        if (existingContent) {
+          sendEvent('resume', { existingContent });
+        }
 
         // Stream tokens from the AI provider
         for await (const token of adapter.stream({
@@ -310,24 +362,89 @@ export async function startGeneration(
 
         // Update DB before closing the stream — awaited so status is
         // consistent by the time cancelGeneration (or anything else) reads it.
+        //
+        // Resume-after-cancel: when the user stops mid-stream and we have
+        // accumulated partial content, persist it as a ContentVersion so a
+        // page refresh doesn't lose the draft. The post stays CANCELLED
+        // (not COMPLETED) — the UI uses that to show the continue/discard
+        // actions instead of the save/discard pair.
         try {
-          await prisma.$transaction([
-            prisma.generationLog.update({
-              where: { id: log.id },
-              data: {
-                status: logStatus,
-                errorCode,
-                errorMessage,
-                abortReason,
-                durationMs,
-                completedAt: new Date(),
-              },
-            }),
-            prisma.blogPost.update({
-              where: { id: postId },
-              data: { status: postStatus },
-            }),
-          ]);
+          const shouldSavePartial =
+            abortReason === 'USER_CANCELLED' && fullContent.trim().length > 0;
+
+          if (shouldSavePartial) {
+            const partialWordCount = countWords(fullContent);
+
+            await prisma.$transaction(async (tx) => {
+              // Deactivate all current versions — same pattern as the
+              // success path so version history stays consistent.
+              await tx.contentVersion.updateMany({
+                where: { postId, isCurrent: true },
+                data: { isCurrent: false },
+              });
+
+              const last = await tx.contentVersion.findFirst({
+                where: { postId },
+                orderBy: { versionNumber: 'desc' },
+                select: { versionNumber: true },
+              });
+
+              await tx.contentVersion.create({
+                data: {
+                  postId,
+                  versionNumber: (last?.versionNumber ?? 0) + 1,
+                  content: fullContent,
+                  format: post.finalFormat,
+                  isCurrent: true,
+                },
+              });
+
+              // Update GenerationLog
+              await tx.generationLog.update({
+                where: { id: log.id },
+                data: {
+                  status: logStatus,
+                  errorCode,
+                  errorMessage,
+                  abortReason,
+                  durationMs,
+                  completedAt: new Date(),
+                },
+              });
+
+              // Update BlogPost — status stays CANCELLED, but finalContent
+              // and wordCount reflect the partial draft so the continue
+              // prompt can pick up from it.
+              await tx.blogPost.update({
+                where: { id: postId },
+                data: {
+                  status: postStatus,
+                  finalContent: fullContent,
+                  wordCount: partialWordCount,
+                },
+              });
+            });
+          } else {
+            // No partial content to save (or non-cancel error) —
+            // update log + post status only, same as before.
+            await prisma.$transaction([
+              prisma.generationLog.update({
+                where: { id: log.id },
+                data: {
+                  status: logStatus,
+                  errorCode,
+                  errorMessage,
+                  abortReason,
+                  durationMs,
+                  completedAt: new Date(),
+                },
+              }),
+              prisma.blogPost.update({
+                where: { id: postId },
+                data: { status: postStatus },
+              }),
+            ]);
+          }
         } catch {
           /* ponytail: log to monitoring if added later */
         }

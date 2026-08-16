@@ -2,7 +2,7 @@
  * POST /api/generate
  * ==================
  * The main generation endpoint.
- * Receives { postId }, validates ownership and status,
+ * Receives { postId, continue?: boolean }, validates ownership and status,
  * then returns an SSE ReadableStream of tokens.
  *
  * The actual orchestration lives in generationService.ts —
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       body.postId,
       session.userId,
       request.signal,
+      { continueFromExisting: body.continue === true },
     );
 
     // Return SSE stream (logId in a header — client needs it before

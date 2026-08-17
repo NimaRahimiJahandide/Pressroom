@@ -1,11 +1,16 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BlogEditor } from '@/components/BlogEditor';
 import { useGenerationStore } from '@/stores/generationStore';
-import { useRestoreVersion, useVersions, type VersionSummary } from '@/hooks/useVersions';
+import {
+  usePost,
+  useRestoreVersion,
+  useVersions,
+  type VersionSummary,
+} from '@/hooks/useVersions';
 
 type PostPageProps = {
   params: { postId: string };
@@ -26,6 +31,54 @@ function PostView({ postId }: { postId: string }) {
   // Content of the version last restored, so the editor opens on that text.
   const [restoredContent, setRestoredContent] = useState<string>();
   const [restoreCount, setRestoreCount] = useState(0);
+
+  // ── Fetch the post's saved data ──
+  // This uses the ['post', postId] query key that useGenerate and
+  // useRestoreVersion already invalidate, so it stays fresh after
+  // generation / restore / cancel.
+  const { data: post } = usePost(postId);
+
+  // ── Store leak fix: reset the global generation store on postId change ──
+  // The Zustand store is a singleton — without this, navigating from post A
+  // (completed) to post B would leave A's phase/tokens in the store, and
+  // BlogEditor's phase effect would paint A's content into B's editor.
+  // Runs synchronously on mount and on every postId change, before the
+  // BlogEditor's own effects read the store.
+  useEffect(() => {
+    useGenerationStore.getState().reset();
+  }, [postId]);
+
+  // ── Seed existing content from the fetched post ──
+  // Once the post data resolves, if the post has saved content (COMPLETED or
+  // CANCELLED with finalContent), seed the store so BlogEditor displays it.
+  // The `phase === 'idle'` guard prevents clobbering a generation the user
+  // may have already started before this fetch resolved.
+  useEffect(() => {
+    if (!post) return;
+    // Defensive: if the resolved data is for a different post (e.g. a stale
+    // query response arrived after navigation), skip.
+    if (post.id !== postId) return;
+
+    const { finalContent } = post;
+    const shouldSeed =
+      (post.status === 'COMPLETED' || post.status === 'CANCELLED') &&
+      typeof finalContent === 'string' &&
+      finalContent.trim().length > 0;
+
+    if (!shouldSeed) return;
+
+    // Only seed if the store is still idle — the user may have already
+    // started a new generation for this post before the fetch resolved.
+    if (useGenerationStore.getState().phase !== 'idle') return;
+
+    useGenerationStore.setState({
+      phase: post.status === 'COMPLETED' ? 'completed' : 'cancelled',
+      tokens: finalContent,
+      versionId: post.currentVersionId,
+      isGenerating: false,
+      error: null,
+    });
+  }, [post, postId]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -48,7 +101,7 @@ function PostView({ postId }: { postId: string }) {
           <div>
             <p className="label-mono text-muted">Editor</p>
             <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
-              Write and edit
+              {post?.title ?? 'Write and edit'}
             </h1>
           </div>
           <button

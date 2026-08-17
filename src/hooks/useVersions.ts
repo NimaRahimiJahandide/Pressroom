@@ -11,6 +11,33 @@ export type VersionSummary = {
   preview: string;
 };
 
+export type PostData = {
+  id: string;
+  title: string;
+  topic: string;
+  status: 'DRAFT' | 'GENERATING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  finalContent: string | null;
+  finalFormat: 'MARKDOWN' | 'HTML';
+  wordCount: number;
+  currentVersionId: string | null;
+};
+
+/**
+ * Fetch a single post's saved data. Uses the `['post', postId]` query key
+ * that `useGenerate` and `useRestoreVersion` already invalidate, so those
+ * existing invalidations keep this query fresh after generation/restore.
+ */
+export function usePost(postId: string) {
+  return useQuery({
+    queryKey: ['post', postId],
+    queryFn: async () => {
+      const res = await fetch(`/api/posts/${postId}`);
+      if (!res.ok) throw new Error('Failed to fetch post');
+      return res.json() as Promise<PostData>;
+    },
+  });
+}
+
 export function useVersions(postId: string) {
   return useQuery({
     queryKey: ['versions', postId],

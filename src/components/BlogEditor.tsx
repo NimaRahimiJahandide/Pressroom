@@ -91,25 +91,26 @@ function ExportControls({
     window.print();
   }, []);
 
-  // ── DOCX: html-to-docx converts the editor's HTML into a .docx Blob.
-  // Dynamic import keeps it out of the initial bundle (it's only needed
-  // when the user clicks Export). The package works client-side — no
-  // server round-trip.
+  // ── DOCX: the conversion runs server-side at /api/export/docx because
+  //    html-to-docx is a Node-only package (depends on fs/encoding).
+  //    The client just sends raw editor HTML + title and receives a
+  //    .docx Blob back.
   const handleExportDOCX = useCallback(async () => {
     if (!editor || exporting !== 'none') return;
     setExporting('docx');
     try {
       const html = editor.getHTML();
-      // Wrap in a basic document structure with the post title as an h1,
-      // so the exported file reads as a titled document.
-      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><h1>${escapeHtml(postTitle)}</h1>${html}</body></html>`;
 
-      const htmlToDocx = (await import('html-to-docx')).default;
-      const blob = await htmlToDocx(fullHtml, undefined, {
-        table: { row: { cantSplit: true } },
+      const response = await fetch('/api/export/docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html, title: postTitle }),
       });
 
-      // Trigger a download with a sanitized filename.
+      if (!response.ok) return;
+
+      // Read the .docx as a Blob and trigger a download.
+      const blob = await response.blob();
       const filename = sanitizeFilename(postTitle);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -154,18 +155,10 @@ function ExportControls({
 // ==========================================
 // Filename sanitizer for DOCX export
 // ==========================================
+// Duplicated server-side in /api/export/docx/route.ts — keep both in sync.
 function sanitizeFilename(title: string): string {
   const cleaned = title.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-');
   return cleaned || 'pressroom-draft';
-}
-
-// Minimal HTML escaper for the title injected into the DOCX wrapper.
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 type BlogEditorProps = {

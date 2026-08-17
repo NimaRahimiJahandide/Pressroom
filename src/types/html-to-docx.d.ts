@@ -2,9 +2,9 @@
  * Minimal type declaration for the `html-to-docx` package.
  *
  * The package ships without its own TypeScript types; this declaration
- * covers the default export we use in BlogEditor's dynamic import:
+ * covers the default export used by the server-side API route:
  *
- *   const htmlToDocx = (await import('html-to-docx')).default;
+ *   import htmlToDocx from 'html-to-docx';
  *   const blob: Blob = await htmlToDocx(htmlString, header?, options?);
  *
  * If the package later ships its own types, this file can be removed.

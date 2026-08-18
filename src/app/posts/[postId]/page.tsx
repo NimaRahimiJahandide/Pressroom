@@ -26,6 +26,32 @@ export default function PostPage({ params }: PostPageProps) {
   );
 }
 
+/* The page frame — header/nav is identical across the loading, error and
+   loaded states, so it lives here rather than being written three times. */
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b border-rule">
+        <div className="mx-auto flex max-w-4xl items-baseline justify-between gap-4 px-5 py-4 sm:px-8">
+          <Link
+            href="/"
+            className="font-display text-lg font-semibold tracking-tight decoration-pine/40 underline-offset-4 hover:underline"
+          >
+            Pressroom
+          </Link>
+          <Link href="/posts" className="label-mono text-muted underline-offset-4 hover:text-ink hover:underline">
+            ← All drafts
+          </Link>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
+        {children}
+      </main>
+    </div>
+  );
+}
+
 function PostView({ postId }: { postId: string }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   // Content of the version last restored, so the editor opens on that text.
@@ -36,7 +62,7 @@ function PostView({ postId }: { postId: string }) {
   // This uses the ['post', postId] query key that useGenerate and
   // useRestoreVersion already invalidate, so it stays fresh after
   // generation / restore / cancel.
-  const { data: post } = usePost(postId);
+  const { data: post, isLoading: isPostLoading, error: postError } = usePost(postId);
 
   // ── Store leak fix: reset the global generation store on postId change ──
   // The Zustand store is a singleton — without this, navigating from post A
@@ -80,68 +106,95 @@ function PostView({ postId }: { postId: string }) {
     });
   }, [post, postId]);
 
+  // ── Loading ──
+  // BlogEditor is deliberately NOT mounted here: it reads the generation
+  // store on mount, so mounting it before `post` resolves would flash an
+  // idle placeholder and then swap in the seeded content.
+  if (isPostLoading && !post) {
+    return (
+      <PageShell>
+        <div className="mb-7">
+          <p className="label-mono text-muted">Editor</p>
+          <p className="label-mono animate-breathe mt-2 text-muted">Loading draft…</p>
+        </div>
+
+        {/* Skeleton in BlogEditor's outer shape, so the layout doesn't jump
+            when the real editor takes its place. */}
+        <div
+          aria-hidden="true"
+          className="min-h-[22rem] border border-rule-strong bg-sheet px-6 py-7 sm:px-8"
+        >
+          <div className="h-4 w-2/5 animate-breathe bg-panel" />
+          <div className="mt-6 h-3 w-full animate-breathe bg-panel" />
+          <div className="mt-3 h-3 w-11/12 animate-breathe bg-panel" />
+          <div className="mt-3 h-3 w-4/5 animate-breathe bg-panel" />
+          <div className="mt-6 h-3 w-full animate-breathe bg-panel" />
+          <div className="mt-3 h-3 w-3/4 animate-breathe bg-panel" />
+        </div>
+      </PageShell>
+    );
+  }
+
+  // ── Error ──
+  if (postError) {
+    return (
+      <PageShell>
+        <div className="border-l-2 border-rust bg-rust-wash/60 px-4 py-3">
+          <p className="label-mono text-rust">Could not load draft</p>
+          <p className="mt-1.5 text-sm text-ink/75">
+            This draft did not come back. Reload the page to try again.
+          </p>
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-rule">
-        <div className="mx-auto flex max-w-4xl items-baseline justify-between gap-4 px-5 py-4 sm:px-8">
-          <Link
-            href="/"
-            className="font-display text-lg font-semibold tracking-tight decoration-pine/40 underline-offset-4 hover:underline"
-          >
-            Pressroom
-          </Link>
-          <Link href="/posts" className="label-mono text-muted underline-offset-4 hover:text-ink hover:underline">
-            ← All drafts
-          </Link>
+    <PageShell>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="label-mono text-muted">Editor</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+            {post?.title ?? 'Write and edit'}
+          </h1>
         </div>
-      </header>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen((open) => !open)}
+          aria-expanded={historyOpen}
+          className={`label-mono border px-3 py-1.5 transition-colors ${
+            historyOpen
+              ? 'border-pine bg-pine-wash text-pine-deep'
+              : 'border-field bg-sheet text-ink/75 hover:bg-panel'
+          }`}
+        >
+          History
+        </button>
+      </div>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-5 py-10 sm:px-8 sm:py-14">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="label-mono text-muted">Editor</p>
-            <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
-              {post?.title ?? 'Write and edit'}
-            </h1>
-          </div>
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((open) => !open)}
-            aria-expanded={historyOpen}
-            className={`label-mono border px-3 py-1.5 transition-colors ${
-              historyOpen
-                ? 'border-pine bg-pine-wash text-pine-deep'
-                : 'border-field bg-sheet text-ink/75 hover:bg-panel'
-            }`}
-          >
-            History
-          </button>
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
+          {/* restoreCount in the key remounts the editor on each restore —
+              the cheapest way to reseed content without touching how
+              BlogEditor handles streaming. */}
+          <BlogEditor
+            key={restoreCount}
+            postId={postId}
+            initialContent={restoredContent}
+          />
         </div>
-
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1">
-            {/* restoreCount in the key remounts the editor on each restore —
-                the cheapest way to reseed content without touching how
-                BlogEditor handles streaming. */}
-            <BlogEditor
-              key={restoreCount}
-              postId={postId}
-              initialContent={restoredContent}
-            />
-          </div>
-          {historyOpen && (
-            <VersionHistory
-              postId={postId}
-              onRestored={(content) => {
-                setRestoredContent(content);
-                setRestoreCount((n) => n + 1);
-              }}
-              onClose={() => setHistoryOpen(false)}
-            />
-          )}
-        </div>
-      </main>
-    </div>
+        {historyOpen && (
+          <VersionHistory
+            postId={postId}
+            onRestored={(content) => {
+              setRestoredContent(content);
+              setRestoreCount((n) => n + 1);
+            }}
+            onClose={() => setHistoryOpen(false)}
+          />
+        )}
+      </div>
+    </PageShell>
   );
 }
 

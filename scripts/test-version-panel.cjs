@@ -20,6 +20,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'vpanel-'));
 // ── stubs: everything the page imports except the panel itself ───────────
 let versionsResult = { isLoading: true };
 let phase = 'completed';
+let postResult = { isLoading: true, data: undefined, error: null };
 
 const stubs = {
   '@tanstack/react-query': {
@@ -36,6 +37,7 @@ const stubs = {
   '@/hooks/useVersions': {
     useVersions: () => versionsResult,
     useRestoreVersion: () => ({ isPending: false, variables: undefined, error: null, mutateAsync: async () => {} }),
+    usePost: () => postResult,
   },
   // The compiled file lives in a temp dir, so hand it react explicitly.
   react: React,
